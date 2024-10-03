@@ -1,0 +1,140 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model team {
+  id        Int     @id @default(autoincrement())
+  clubName  String
+  email     String  @unique
+  password  String
+  events event[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  fansRegistrationLink String?
+}
+
+model user {
+  id Int @id @default(autoincrement())
+  firstName String
+  lastName String
+  email String @unique
+  password String?
+  teamId Int 
+  roleId Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model role {
+  id Int @id @default(autoincrement())
+  roleName String
+  teamId Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime?
+}
+
+model player {
+  id Int @id @default(autoincrement())
+  firstName String
+  lastName String
+  position String
+  squadNumber String
+  imageLink String
+  teamId Int 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model inviteTokens {
+  id Int @id @default(autoincrement())
+  token String
+  userId Int
+  expiresAt DateTime
+}
+
+model event {
+  id          Int      @id @default(autoincrement())
+  name        String   
+  type        eventType 
+  date        DateTime 
+  location    String   
+  description String?  
+  registrationLink String?
+  requiresPayment Boolean @default(false)
+  registrationFee Float?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime? @updatedAt
+  createdBy   Int? 
+  teamId      Int      
+  team        team     @relation(fields: [teamId], references: [id])
+  match       match?   
+
+}
+
+model match {
+  id          Int      @id @default(autoincrement())
+  eventId     Int      @unique
+  homeTeam    String?
+  opponent    String
+  matchType   matchType
+  homeTeamScore Int?
+  awayTeamScore Int?
+  homeTeamLogoUrl String
+  awayTeamLogoUrl String
+  event     event @relation(fields: [eventId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime?
+}
+
+enum eventType {
+  MATCH
+  OTHER
+}
+
+enum matchType {
+  LEAGUE
+  FRIENDLY
+  TOURNAMENT
+}
+
+model eventRegistration{
+  id Int @id @default(autoincrement())
+  firstName String
+  lastName String
+  email String
+  paymentLink String?
+  paymentReference String?
+  eventId Int
+  paid Boolean @default(false)
+}
+
+model fan{
+  id Int @id @default(autoincrement())
+  firstName String
+  lastName String
+  emailAddress String
+  clubId Int
+}
+
+model sponsorship{
+  id Int @id @default(autoincrement())
+  sponsorName String
+  contactPerson String
+  duration String
+  startDate DateTime
+  endDate DateTime
+  sponsorLogoLink String
+  sponsorshipType String?
+  teamId Int
+}
