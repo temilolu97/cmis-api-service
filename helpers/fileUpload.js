@@ -1,24 +1,17 @@
 const multer = require('multer');
 const path = require('path');
 
-// Set storage engine
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(http://176.74.18.130, '../../public_html/uploads')); 
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname)); 
-  },
-});
+// Set storage engine (storing file in memory)
+const storage = multer.memoryStorage();
 
 // Initialize multer
 const upload = multer({
   storage: storage,
-  limits: { fileSize: 1000000 }, 
+  limits: { fileSize: 1000000 }, // 1MB limit
   fileFilter: (req, file, cb) => {
     checkFileType(file, cb);
   }
-})
+});
 
 // Check file type (optional)
 function checkFileType(file, cb) {
@@ -36,4 +29,4 @@ function checkFileType(file, cb) {
   }
 }
 
-module.exports = upload
+module.exports = upload;

@@ -25,7 +25,7 @@ const inviteNewEmployee = async (req, res) => {
         })
         console.log(userInfo);
 
-        if (user.roleId != 1) throw new Error("You do not have access to this resource")
+        // if (user.roleId != 1) throw new Error("You do not have access to this resource")
         if (userInfo) throw new Error("User already exists")
         const employee = await prisma.user.create({
             data: {

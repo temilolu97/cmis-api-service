@@ -3,6 +3,7 @@ const { getCustomerId } = require('../helpers/utils');
 const prisma = require('../prisma/client');
 const { getProfile } = require('./authController');
 const { getUserDetails } = require('./userController');
+const cloudinary = require('../helpers/cloudinary')
 
 // Helper to get user by req.userId
 const getUser = async (userId) => {
@@ -140,18 +141,11 @@ const addNewPlayer = async (req, res) => {
                 message: "User not found",
             });
         }
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
 
-        console.log(req.get('host'))
-        const host ='http://176.74.18.130/'
-        // Construct the image URL
-        console.log(req.file);
-        
-        const imageLink = req.file
-            ? `${host}/uploads/${req.file.filename}`
-            : null;
-
-        console.log(imageLink);
-
+        let link = await uploadToCloudinary(req.file.buffer);
         const player = await prisma.player.create({
             data: {
                 firstName,
@@ -159,7 +153,7 @@ const addNewPlayer = async (req, res) => {
                 teamId: user.teamId,
                 position,
                 squadNumber,
-                imageLink,
+                imageLink: link,
             },
         });
 
@@ -222,6 +216,23 @@ const generateNewFanRegistrationLink = async (req, res) => {
 
 
 }
+
+const uploadToCloudinary = (fileBuffer) => {
+    return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+            { folder: 'cmis/uploads' },
+            (error, result) => {
+                if (error) {
+                    reject(error);
+                } else {
+                    resolve(result.secure_url);  // Return the URL of the uploaded image
+                }
+            }
+        );
+        stream.end(fileBuffer);  // Send the file buffer to the upload stream
+    });
+};
+
 
 module.exports = {
     getTeamEmployees,
