@@ -29,6 +29,11 @@ app.use('/api/hooks', hooksRoutes)
 app.use('/api/fans', fanRoutes)
 app.use('/api/sponsorships', sponsorshipRoutes)
 
+app.use("/",(req,res)=>{
+    return res.status(200).json({
+        message:"We are up"
+    })
+})
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
