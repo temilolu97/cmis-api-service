@@ -1,5 +1,6 @@
 const express = require('express');
 const app = express();
+const cors = require('cors')
 const multer = require("multer");
 const upload = multer({ dest: "uploads/" });
 const authRoutes = require('./routes/authRoutes')
@@ -15,6 +16,7 @@ const swaggerDocument = require('./swagger-output.json')
 const swaggerUi = require('swagger-ui-express')
 
 app.use(express.json()); // Middleware to parse JSON bodies
+app.use(cors());
 
 // Routes
 // app.use('/api/users', userRoutes);
