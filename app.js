@@ -21,21 +21,20 @@ app.use(cors());
 // Routes
 // app.use('/api/users', userRoutes);
 // app.use('/api/teams', teamRoutes);
+app.get('/', (req, res) => {
+    res.json({ message: 'Server is up and running!' });
+});
+
 app.use('/api/auth', authRoutes)
-app.use('/api/team',teamRoutes)
+app.use('/api/team', teamRoutes)
 app.use('/api/users', userRoutes)
 app.use('/api/roles', rolesRoutes)
 app.use('/api/employees', employeeRoute)
-app.use('/api/events',eventRoutes)
+app.use('/api/events', eventRoutes)
 app.use('/api/hooks', hooksRoutes)
 app.use('/api/fans', fanRoutes)
 app.use('/api/sponsorships', sponsorshipRoutes)
 
-app.use("/",(req,res)=>{
-    return res.status(200).json({
-        message:"We are up"
-    })
-})
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
