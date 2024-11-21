@@ -1,35 +1,16 @@
 const { default: axios } = require("axios");
-const { getUser } = require("../helpers/utils")
+const { getUser, initializePayment, frontendUrl } = require("../helpers/utils")
 const prisma = require("../prisma/client")
-const crypto = require('crypto')
+const crypto = require('crypto');
+const { uploadToCloudinary } = require("./teamController");
 
 const generateRegistrationLink = (eventId) => {
     const token = crypto.randomBytes(8).toString('hex');
-    return `https://localhost:3000/events/${eventId}/register/${token}`; // Adjust the base URL
+    return `${frontendUrl()}/events/${eventId}/register/${token}`; // Adjust the base URL
 };
 
 //initialize payment
-const initializePayment = async (email, amount, callbackUrl) => {
-    const baseUrl = 'https://api.budpay.com/api/v2/transaction/initialize';
-    const payload = {
-        amount:amount.toString(),
-        callback: callbackUrl,
-        email,
-    };
-    const headers = {
-        Authorization: `Bearer sk_test_ch7lxmygafdaswmxih15xinzwtzo2ak8jxmn4ra`, 
-        'Content-Type': 'application/json',
-    };
 
-    try {
-        const response = await axios.post(baseUrl, payload, { headers });
-        console.log("Payment initialization response:", response.data);
-        return response.data;
-    } catch (error) {
-        console.error("Error initializing payment:", error.response ? error.response.data : error.message);
-        throw new Error("Payment initialization failed");
-    }
-};
 
 //create organization event
 const createNewEvent = async (req, res) => {
@@ -37,9 +18,20 @@ const createNewEvent = async (req, res) => {
         const user = await getUser(req.userId)
         const { eventName, eventType, eventDate, eventLocation, eventDescription, matchType, opponent, requiresPayment, fee } = req.body
 
-        const homeTeamLogoUrl = req.files['homeTeamLogo'] ? req.files['homeTeamLogo'][0].path : '';
-        const awayTeamLogoUrl = req.files['awayTeamLogo'] ? req.files['awayTeamLogo'][0].path : '';
+        const homeTeamLogo = req.files['homeTeamLogo'] ? req.files['homeTeamLogo'][0] : null;
+        const awayTeamLogo = req.files['awayTeamLogo'] ? req.files['awayTeamLogo'][0] : null;
 
+        let homeTeamLogoUrl = '';
+        let awayTeamLogoUrl = '';
+        console.log(homeTeamLogo, awayTeamLogo);
+
+        // Only upload if file exists
+        if (homeTeamLogo) {
+            homeTeamLogoUrl = await uploadToCloudinary(homeTeamLogo.buffer);
+        }
+        if (awayTeamLogo) {
+            awayTeamLogoUrl = await uploadToCloudinary(awayTeamLogo.buffer);
+        };
         const team = await prisma.team.findFirst({
             where: {
                 id: user.teamId
@@ -93,7 +85,7 @@ const createNewEvent = async (req, res) => {
     catch (err) {
         return res.status(500).json({
             error: err.message,
-            message: "Could not create a new employee",
+            message: "Could not create a new event",
             status: "failed",
             statusCode: "99"
         })
@@ -111,12 +103,24 @@ const getAllEvents = async (req, res) => {
                 ...(type !== 'All' && type ? { type: type.toUpperCase() } : {})
             }
         })
+        const eventsWithMatchData = await Promise.all(
+            events.map(async (event) => {
+                if (event.type === "MATCH") {
+                    const matchData = await prisma.match.findFirst({
+                        where: { eventId: event.id }
+                    });
+                    event.match = matchData;
+                }
+                return event;
+            })
+        );
+
 
         return res.status(200).json({
             message: "Event fetched successfully",
             status: "success",
             statusCode: "00",
-            data: events
+            data: eventsWithMatchData
         })
     }
     catch (err) {
@@ -177,41 +181,59 @@ const eventRegistration = async (req, res) => {
                 id: eventId
             }
         })
-
+        const eventReg = await prisma.eventRegistration.findFirst({
+            where: {
+                email: email,
+                paid: true,
+                eventId:eventId
+            }
+        })
+        if (eventReg) throw ("You have previously successfully registered for this event")
         if (!event) throw new Error("Event Id not found");
 
         console.log(event);
-        
-        if(event.requiresPayment){
-            
-            var transaction = await initializePayment(email, event.registrationFee, "https://localhost:3000")
-            
-            const registration= await prisma.eventRegistration.create({
-                data:{
-                    firstName,
-                    lastName,
-                    email,
-                    eventId:eventId,
-                    paid:false,
-                    paymentLink:transaction.data.authorization_url,
-                    paymentReference:transaction.data.reference
+
+        if (event.requiresPayment) {
+
+            var transaction = await initializePayment(email, event.registrationFee, `${frontendUrl()}/payment-status?type=event`)
+            //log transaction details
+            const details = await prisma.transactions.create({
+                data: {
+                    transactionType: "Events Payment",
+                    transactionReference: transaction.data.reference,
+                    transactionStatus: "New",
+                    teamId: event.teamId,
+                    transactionAmount: event.registrationFee,
+                    direction: "C"
                 }
             })
-            return res.status(201).json({
-                message: "Registration created, please complete payment",
-                status: "success",
-                statusCode: "00",
-                paymentLink:transaction.data.authorization_url
-            })
-        }
-        else{
             const registration = await prisma.eventRegistration.create({
-                data:{
+                data: {
                     firstName,
                     lastName,
                     email,
-                    eventId:eventId,
-                    paid:false
+                    eventId: parseInt(eventId),
+                    paid: false,
+                    paymentLink: transaction.data.authorization_url,
+                    paymentReference: transaction.data.reference
+                }
+            })
+
+            return res.status(201).json({
+                message: "Registration initiated, please complete payment",
+                status: "success",
+                statusCode: "00",
+                paymentLink: transaction.data.authorization_url
+            })
+        }
+        else {
+            const registration = await prisma.eventRegistration.create({
+                data: {
+                    firstName,
+                    lastName,
+                    email,
+                    eventId: eventId,
+                    paid: false
                 }
             })
             return res.status(201).json({
@@ -222,16 +244,127 @@ const eventRegistration = async (req, res) => {
             });
         }
 
-        
+
     }
     catch (err) {
         return res.status(500).json({
             error: err.message,
-            message:"Event registration could not be completed",
+            message: "Event registration could not be completed",
             status: "failed",
             statusCode: "99"
         })
     }
+
+
+}
+
+const completeEventRegistration = async (req, res) => {
+    try {
+        const { reference, status } = req.body
+        //find transaction by reference
+        const transaction = await prisma.transactions.findFirst({
+            where: {
+                transactionReference: reference
+            }
+        })
+        if (!transaction) throw new Error("No transaction exists with this reference")
+
+
+        await prisma.transactions.update({
+            where: {
+                transactionReference: reference
+            },
+            data: {
+                transactionStatus: status,
+                dateUpdated: new Date()
+            }
+        })
+        if (status == "success") {
+            console.log(status);
+            let registration = await prisma.eventRegistration.update({
+                where: {
+                    paymentReference: reference
+                },
+                data: {
+                    paid: true
+                }
+            })
+
+
+            //fund wallet
+            const wallet = await prisma.wallets.findFirst({
+                where: {
+                    clubid: transaction.teamId
+                }
+            })
+            await prisma.wallets.update({
+                where: {
+                    id: wallet.id
+                },
+                data: {
+                    availableBalance: wallet.availableBalance + transaction.transactionAmount
+                }
+            })
+        }
+        return res.status(200).json({
+            message: "Registration completed successfully",
+            data: null
+        })
+    }
+    catch (err) {
+        return res.status(500).json({
+            error: err.message,
+            message: "Unable to complete registration",
+            status: "failed",
+            statusCode: "99"
+        })
+    }
+
+}
+
+//get registrants for an event
+const getEventRegistrants = async (req, res) => {
+    try {
+        const { eventId } = req.params
+        console.log(eventId);
+        
+        const eventDetails = await prisma.event.findFirst({
+            where: {
+                id: parseInt(eventId)
+            }
+        })
+        console.log(eventDetails);
+        
+        let registrants
+        if (eventDetails.requiresPayment == false) {
+            registrants = await prisma.eventRegistration.findMany({
+                where: {
+                    eventId: eventDetails.id,
+                    paid: false
+                }
+            })
+        } else {
+            registrants = await prisma.eventRegistration.findMany({
+                where: {
+                    eventId: eventDetails.id,
+                    paid: true
+                }
+            })
+        }
+        return res.status(200).json({
+            message:"Registrants fetched successfully",
+            data:registrants
+        })
+    }
+    catch(err){
+        return res.status(500).json({
+            error: err.message,
+            message: "Unable to fetch event registrants",
+            status: "failed",
+            statusCode: "99"
+        })
+    }
+    
 
 
 }
@@ -241,5 +374,7 @@ module.exports = {
     createNewEvent,
     getAllEvents,
     getEventDetails,
-    eventRegistration
+    eventRegistration,
+    completeEventRegistration,
+    getEventRegistrants
 }

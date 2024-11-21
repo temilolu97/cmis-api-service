@@ -5,6 +5,8 @@ const { getProfile } = require('./authController');
 const { getUserDetails } = require('./userController');
 const cloudinary = require('../helpers/cloudinary')
 
+
+
 // Helper to get user by req.userId
 const getUser = async (userId) => {
     return await prisma.user.findFirst({
@@ -132,8 +134,10 @@ const addNewPlayer = async (req, res) => {
     try {
 
 
-        const { firstName, lastName, position, squadNumber } = req.body;
+        const { firstName, lastName, position, squadNumber, dob, dateJoined, annualSalary, contractExpiryDate } = req.body;
         const user = await getUser(req.userId);
+        console.log(req.file);
+        
 
         if (!user) {
             return res.status(404).json({
@@ -145,6 +149,8 @@ const addNewPlayer = async (req, res) => {
             return res.status(400).json({ message: 'No file uploaded' });
         }
 
+        
+
         let link = await uploadToCloudinary(req.file.buffer);
         const player = await prisma.player.create({
             data: {
@@ -153,6 +159,10 @@ const addNewPlayer = async (req, res) => {
                 teamId: user.teamId,
                 position,
                 squadNumber,
+                dateJoined: dateJoined,
+                dateOfBirth:dob,
+                annualSalary:parseFloat(annualSalary),
+                contractExpiryDate:contractExpiryDate,
                 imageLink: link,
             },
         });
@@ -173,42 +183,26 @@ const addNewPlayer = async (req, res) => {
     }
 };
 
-const generateNewFanRegistrationLink = async (req, res) => {
+const getFanRegistrationLink = async (req, res) => {
     try {
-
-        const { id } = req.params
-        console.log(id);
-
         const user = await getUser(req.userId)
-
-        const team = await prisma.team.findFirst({
-            where: {
-                id: Number(id)
+        const linkDetails = await prisma.fanRegistrationLinks.findFirst({
+            where:{
+                clubId:user.teamId,
+                isActive:true
             }
         })
-        console.log(team);
 
-        if (user.teamId != team.id) throw new Error("You do not have access to perform this action")
-        if (!team) throw new Error("No team exists with that id")
-        let link = `https://yourapp.com/register-fan/${team.id}`
-        let newTeam = await prisma.team.update({
-            where: {
-                id: team.id
-            },
-            data: {
-                fansRegistrationLink: link
-            }
+        const link = linkDetails.registrationLink
+        return res.status(200).json({
+            message:"Link fetched successfully",
+            data:link
         })
-        res.status(200).json({
-            statusCode: "00",
-            message: "Fans regustration link created successfully",
-            data: newTeam
-        });
     }
     catch (err) {
         res.status(500).json({
             error: err.message,
-            message: "Could not generate new link",
+            message: "Could not fetch link",
             status: "failed",
             statusCode: "99"
         });
@@ -239,5 +233,6 @@ module.exports = {
     getAllPlayers,
     addNewPlayer,
     getPlayerDetails,
-    generateNewFanRegistrationLink
+    getFanRegistrationLink,
+    uploadToCloudinary
 };

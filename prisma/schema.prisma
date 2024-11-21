@@ -45,6 +45,14 @@ model role {
   updatedAt DateTime?
 }
 
+model permissions {
+  id Int @id @default(autoincrement())
+  action String
+  dateCreated DateTime @default(now())
+  updatedAt DateTime?
+}
+
+
 model player {
   id Int @id @default(autoincrement())
   firstName String
@@ -53,6 +61,10 @@ model player {
   squadNumber String
   imageLink String
   teamId Int 
+  dateJoined DateTime
+  dateOfBirth DateTime
+  contractExpiryDate DateTime
+  annualSalary Float
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -113,9 +125,9 @@ model eventRegistration{
   id Int @id @default(autoincrement())
   firstName String
   lastName String
-  email String
-  paymentLink String?
-  paymentReference String?
+  email String 
+  paymentLink String? @unique
+  paymentReference String? @unique
   eventId Int
   paid Boolean @default(false)
 }
@@ -126,6 +138,9 @@ model fan{
   lastName String
   emailAddress String
   clubId Int
+  fanCategoryId Int
+  dateCreated DateTime? @default(now())
+  dateUpdated DateTime?
 }
 
 model sponsorship{
@@ -138,4 +153,63 @@ model sponsorship{
   sponsorLogoLink String
   sponsorshipType String?
   teamId Int
+  sponsorshipValue Float
+  dateCreated DateTime @default(now())
+  dateUpdated DateTime?
+}
+
+model transactions{
+  id Int @id @default(autoincrement())
+  transactionType String
+  transactionReference String @unique
+  teamId Int? 
+  direction String?
+  transactionStatus String
+  transactionAmount Float @default(0)
+  dateCreated DateTime @default(now())
+  dateUpdated DateTime?
+}
+
+model fanRegistrationLinks{
+    id Int @id @default(autoincrement())
+    clubId Int
+    registrationLink String
+    token String
+    isActive Boolean
+    dateCreated DateTime @default(now())
+    dateUpdated DateTime?
+}
+
+model fanCategories{
+  id Int @id @default(autoincrement())
+  categoryName String
+  ticketPrice Float
+  clubId Int
+  dateCreated DateTime @default(now())
+  dateUpdated DateTime?
+  dateDeleted DateTime?
+}
+
+model fanRegistrationPayments{
+    id Int @id @default(autoincrement())
+    firstName String
+    lastName String
+    emailAddress String
+    clubId Int
+    amount Float
+    transactionReference String
+    status String
+    categoryId Int?
+    dateCreated DateTime @default(now())
+    dateUpdated DateTime?
+}
+
+model wallets{
+  id Int @id @default(autoincrement())
+  clubid Int @unique
+  availableBalance Float
+  ledgerBalance Float
+  currency String
+  dateCreated DateTime @default(now())
+  dateUpdated DateTime?
 }

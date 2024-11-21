@@ -26,6 +26,15 @@ const receiveBudpayHook =async(req,res)=>{
                 paid:true
             }
         })
+        await prisma.transactions.update({
+            where:{
+                transactionReference:data.reference
+            },
+            data:{
+                transactionStatus:data.status,
+                dateUpdated:new Date()
+            }
+        })
         return res.status(200).json({
             message:"Hook received"
         })

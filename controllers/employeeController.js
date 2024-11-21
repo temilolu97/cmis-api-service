@@ -1,4 +1,4 @@
-const { verifyToken } = require('../helpers/utils');
+const { verifyToken, frontendUrl, getUser } = require('../helpers/utils');
 const prisma = require('../prisma/client');
 const crypto = require('crypto');
 const bcrypt = require('bcrypt')
@@ -6,12 +6,17 @@ const bcrypt = require('bcrypt')
 
 
 
-// Helper to get user by req.userId
-const getUser = async (userId) => {
-    return await prisma.user.findFirst({
-        where: { id: userId }
-    });
-};
+// // Helper to get user by req.userId
+// const getUser = async (userId) => {
+//     return await prisma.user.findFirst({
+//         where: { id: userId }
+//     });
+// };
+
+
+const addEmployee = async(req, res) =>{
+
+}
 
 const inviteNewEmployee = async (req, res) => {
     try {
@@ -47,14 +52,17 @@ const inviteNewEmployee = async (req, res) => {
                 expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24)
             }
         })
-        const inviteLink = `https://your-app.com/accept-invite?token=${token}`;
+
+        const inviteLink = `${frontendUrl()}/invitation?token=${token}`;
 
         //todo: implement email sendig for customer to set up password
         return res.status(201).json({
             message: "Employee invited successfully",
             status: "success",
             statusCode: "00",
-            data: employee
+            data: employee,
+            token,
+            inviteLink
         })
     }
     catch (err) {
@@ -72,34 +80,43 @@ const inviteNewEmployee = async (req, res) => {
 const acceptInvite = async (req, res) => {
     try {
         const { token } = req.query
-        const { password, cpassword } = req.body
+        const { password, cpassword, value } = req.body
+        if(value == "Yes"){
+            if (!token) throw new Error("Token is required")
 
-        if (!token) throw new Error("Token is required")
-
-        const payload = await verifyToken(token);
+                const payload = await verifyToken(token);
+                
+                if (!payload) throw new Error("Invalid or expired token")
         
-        if (!payload) throw new Error("Invalid or expired token")
-
-        const user = await prisma.user.findFirst({
-            where: { id: payload.userId }
-        });        
-
-        if (!user) throw new Error('User not found')
-        if (password != cpassword) throw new Error("Your passwords do not match")
-        const hashedPassword = await bcrypt.hash(password, 10);
-        console.log(hashedPassword);
+                const user = await prisma.user.findFirst({
+                    where: { id: payload.userId }
+                });        
         
-        let userInfor = await prisma.user.update({
-            where: { id: user.id },
-            data: { password: hashedPassword }
-        });
-
-        return res.status(200).json({
-            message: "Password set successfully",
-            status: "success",
-            statusCode: "00",
-            data:userInfor
-        });
+                if (!user) throw new Error('User not found')
+                if (password != cpassword) throw new Error("Your passwords do not match")
+                const hashedPassword = await bcrypt.hash(password, 10);
+                console.log(hashedPassword);
+                
+                let userInfor = await prisma.user.update({
+                    where: { id: user.id },
+                    data: { password: hashedPassword }
+                });
+        
+                return res.status(200).json({
+                    message: "Password set successfully",
+                    status: "success",
+                    statusCode: "00",
+                    data:userInfor
+                });
+        }else{
+            return res.status(200).json({
+                message: "Invite declined",
+                status: "success",
+                statusCode: "00",
+                data:userInfor
+            });
+        }
+        
     }
     catch(err){
         return res.status(500).json({
@@ -114,22 +131,42 @@ const acceptInvite = async (req, res) => {
 const getEmployees = async (req, res) => {
     try {
         const user = await getUser(req.userId)
+        
+        //get superAdminId
+        const superAdmin = await prisma.role.findFirst({
+            where:{
+                teamId:0
+            }
+        })
+        console.log(superAdmin);
+        
+        //
         const employees = await prisma.user.findMany({
             where: {
                 teamId: user.teamId,
-                roleId: {
-                    not: 1
+                NOT:{
+                    roleId: superAdmin.id
                 }
-            },
-            include:{
-                role:true
             }
         })
+        const employeesWithRoles = await Promise.all(employees.map(async (employee) => {
+            const role = await prisma.role.findFirst({
+                where: {
+                    id: employee.roleId
+                }
+            });
+            return {
+                ...employee,
+                role: role?.roleName || null 
+            };
+        }));
+        console.log(employeesWithRoles);
+        
         return res.status(200).json({
             message: "Employees fetched successfully",
             status: "success",
             statusCode: "00",
-            data: employees
+            data: employeesWithRoles
         })
     }
     catch (err) {

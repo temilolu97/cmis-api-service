@@ -12,6 +12,8 @@ const employeeRoute = require('./routes/employeeRoutes')
 const fanRoutes = require('./routes/fanRoutes')
 const sponsorshipRoutes = require('./routes/sponsorshipRoutes')
 const hooksRoutes = require('./routes/hookRoutes')
+const walletRoutes = require('./routes/walletRoutes')
+const metricRoutes = require('./routes/metricsRoutes')
 const swaggerDocument = require('./swagger-output.json')
 const swaggerUi = require('swagger-ui-express')
 
@@ -34,6 +36,9 @@ app.use('/api/events', eventRoutes)
 app.use('/api/hooks', hooksRoutes)
 app.use('/api/fans', fanRoutes)
 app.use('/api/sponsorships', sponsorshipRoutes)
+app.use('/api/wallets',walletRoutes)
+app.use('/api/metrics',metricRoutes)
+
 
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
