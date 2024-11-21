@@ -33,7 +33,7 @@ const verifyToken = async (token) => {
 };
 
 const frontendUrl = () =>{
-    return 'http://localhost:5173'
+    return 'https://cmis-admin-frontend.vercel.app'
 }
 
 const initializePayment = async (email, amount, callbackUrl, reference) => {
