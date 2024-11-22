@@ -227,7 +227,7 @@ const generateRegistrationLink = async (req, res) => {
         const newLink = await prisma.fanRegistrationLinks.create({
             data: {
                 clubId: user.teamId,
-                registrationLink: `${frontendUrl}/fans/registration/${token}`,
+                registrationLink: `${frontendUrl()}/fans/registration/${token}`,
                 token: token,
                 isActive: true,
                 dateCreated: new Date(),
