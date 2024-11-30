@@ -3,11 +3,11 @@ const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
 const { createWallet } = require('./walletController')
 const registerClub = async (req, res) => {
-    const { email, teamName, password, cpassword} = req.body
+    const { email, teamName, password, cpassword } = req.body
     const hashedPassword = await bcrypt.hash(password, 10)
 
     try {
-        if(password != cpassword) throw new Error("Passwords do not match")
+        if (password != cpassword) throw new Error("Passwords do not match")
         const teamExists = await prisma.team.findFirst({
             where: {
                 OR: [
@@ -48,8 +48,8 @@ const registerClub = async (req, res) => {
         console.log(user);
         //create team wallet
         await prisma.wallets.create({
-            data:{
-                clubid:team.id,
+            data: {
+                clubid: team.id,
                 availableBalance: 0,
                 ledgerBalance: 0,
                 currency: "NGN",
@@ -84,13 +84,13 @@ const login = async (req, res) => {
         const clubDetails = await prisma.team.findFirst({ where: { id: user.teamId } })
         user.clubDetails = clubDetails
         const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '1d' });
-        res.status(200).json({ message:"Logged in successfully",token, user })
+        res.status(200).json({ message: "Logged in successfully", token, user })
     }
     catch (error) {
         res.status(400).json({
             error: error.message,
-            message:"Unable to login",
-            statusCode:"99"
+            message: "Unable to login",
+            statusCode: "99"
         })
     }
 }
@@ -103,12 +103,12 @@ const getProfile = async (req, res) => {
         }
     })
     const team = await prisma.team.findFirst({
-        where:{
-            id:user.teamId
+        where: {
+            id: user.teamId
         }
     })
 
-     user.teamName = team.clubName
+    user.teamName = team.clubName
     return res.status(200).json({
         statusCode: "00",
         message: "User details fetched successfully",
@@ -116,8 +116,56 @@ const getProfile = async (req, res) => {
     })
 }
 
+const resetPassword = async (req, res) => {
+    try {
+
+        const { emailAddress, password, cPassword } = req.body
+        const team = await prisma.team.findFirst({
+            where: {
+                email: emailAddress
+            }
+        })
+        if (!team) throw new Error("No team exists with this email")
+        if (password !== cPassword) throw new Error("Passwords do not match")
+        const hashPassword = await bcrypt.hash(password, 10)
+
+        await prisma.team.update({
+            where: {
+                id: team.id
+            },
+            data: {
+                password: hashPassword,
+                updatedAt: new Date()
+            }
+        })
+
+        await prisma.user.update({
+            where: {
+                email:emailAddress,
+            },
+            data: {
+                password: hashPassword,
+                updatedAt: new Date()
+            }
+        })
+        return res.status(200).json({
+            message:"Password reset successfully",
+            data:null
+        })
+    }
+    catch(err){
+        res.status(400).json({
+            error: err.message,
+            message: "Unable to change password",
+            statusCode: "99"
+        })
+    }
+
+}
+
 module.exports = {
     registerClub,
     login,
-    getProfile
+    getProfile,
+    resetPassword
 }
